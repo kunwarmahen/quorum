@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quorum · AI meeting minutes</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2.5" width="6" height="11" rx="3" />
+          <path d="M5.5 11a6.5 6.5 0 0 0 13 0" />
+          <line x1="12" y1="17.5" x2="12" y2="21" />
+          <line x1="8.5" y1="21" x2="15.5" y2="21" />
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1>Quorum</h1>
+        <span class="brand-sub">AI meeting minutes</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="health" id="healthStrip">
+        <span class="health-pill" id="obsStatus" title="OBS">
+          <span class="obs-light" id="obsLight"></span>
+          <span id="obsText">checking OBS…</span>
+        </span>
+      </div>
+      <button class="btn btn-ghost btn-gear" id="btnConfig" title="Config" aria-label="Config">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel config-panel" id="configPanel" hidden>
+      <div class="panel-head">
+        <h2>Config — models</h2>
+        <button class="x" id="configClose" title="Close">✕</button>
+      </div>
+      <p class="muted">
+        Pick the models used for transcription and minutes. Choices are saved
+        and used for every run. The lists come live from each server; if a
+        server is unreachable the current value is still shown.
+      </p>
+      <div class="config-grid">
+        <label class="lvl">
+          Whisper STT model
+          <select id="sttModelSelect"><option>loading…</option></select>
+          <span class="cfg-note" id="sttNote"></span>
+        </label>
+        <label class="lvl">
+          Ollama model (minutes)
+          <select id="ollamaModelSelect"><option>loading…</option></select>
+          <span class="cfg-note" id="ollamaNote"></span>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel record-panel">
+      <div class="record-left">
+        <h2>Record a meeting</h2>
+        <p class="muted">
+          Controls OBS Studio on your host. The recording is saved into your
+          home folder, then runs through the pipeline below.
+        </p>
+      </div>
+      <div class="record-actions">
+        <span class="rec-timer" id="recTimer"></span>
+        <button class="btn btn-rec" id="btnStart">● Start recording</button>
+        <button class="btn btn-stop" id="btnStop" disabled>■ Stop &amp; process</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Files &amp; pipeline</h2>
+        <div class="head-controls">
+          <label class="lvl">
+            Sort
+            <select id="sortSelect">
+              <option value="created_desc">Newest first</option>
+              <option value="created_asc">Oldest first</option>
+              <option value="name_asc">Name (A–Z)</option>
+              <option value="name_desc">Name (Z–A)</option>
+            </select>
+          </label>
+          <label class="lvl">
+            Minutes detail
+            <select id="levelSelect">
+              {% for key, lv in levels.items() %}
+              <option value="{{ key }}" {% if key == default_level %}selected{% endif %}>{{ lv.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button class="btn btn-ghost" id="btnScan">↻ Scan folder</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="recTable">
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>Pipeline&nbsp;:&nbsp;source → mp3 → transcript → minutes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="recBody">
+            <tr><td colspan="3" class="empty">No files yet. Record a meeting or drop a .mkv/.mp3 into ~/MeetingMinutes/recordings and hit “Scan folder”.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Detail drawer -->
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="drawer">
+    <div class="drawer-head">
+      <h3 id="drawerTitle">Details</h3>
+      <button class="x" id="drawerClose">✕</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="minutes">Minutes</button>
+      <button class="tab" data-tab="transcript">Transcript</button>
+      <button class="btn btn-sm copy-btn" id="copyBtn" title="Copy to clipboard">⧉ Copy</button>
+    </div>
+    <div class="drawer-body">
+      <div class="tab-pane active" id="pane-minutes"></div>
+      <div class="tab-pane" id="pane-transcript"></div>
+    </div>
+  </aside>
+
+  <!-- Delete confirmation -->
+  <div class="modal-backdrop" id="confirmBackdrop"></div>
+  <div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle">Delete this meeting?</h3>
+    <p class="muted" id="confirmName"></p>
+    <p class="del-intro">This permanently removes the following from disk — this can’t be undone:</p>
+    <ul class="del-list" id="confirmList"></ul>
+    <label class="del-confirm">
+      Type <b>delete</b> to confirm:
+      <input type="text" id="confirmInput" autocomplete="off" spellcheck="false" placeholder="delete" />
+    </label>
+    <div class="modal-actions">
+      <button class="btn" id="confirmCancel">Cancel</button>
+      <button class="btn btn-danger" id="confirmDelete" disabled>Delete permanently</button>
+    </div>
+  </div>
+
+  <script>
+    window.LEVELS = {{ levels|tojson }};
+  </script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

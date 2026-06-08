@@ -1,0 +1,65 @@
+"""Speech-to-text via an external OpenAI-compatible STT server.
+
+Posts the audio to {STT_BASE_URL}/audio/transcriptions, the same shape as
+OpenAI's transcription API (works with speaches / faster-whisper-server / etc.).
+"""
+import os
+
+import requests
+
+import config
+
+
+def _auth_headers() -> dict:
+    if config.STT_API_KEY:
+        return {"Authorization": f"Bearer {config.STT_API_KEY}"}
+    return {}
+
+
+def list_models() -> list:
+    """Return the model ids the STT server reports via /v1/models (may raise)."""
+    resp = requests.get(f"{config.STT_BASE_URL}/models",
+                        headers=_auth_headers(), timeout=5)
+    resp.raise_for_status()
+    ids = [m.get("id", "") for m in resp.json().get("data", [])]
+    return sorted(i for i in ids if i)
+
+
+def health() -> dict:
+    """Liveness check for the STT server, plus whether the configured model is
+    listed by /v1/models. Never raises; used by the dashboard health panel."""
+    model = config.effective_stt_model()
+    info = {"name": "Whisper STT", "url": config.STT_BASE_URL, "ok": False,
+            "model": model}
+    try:
+        ids = list_models()
+        info["ok"] = True
+        if ids:
+            info["model_ready"] = model in ids
+    except ValueError:
+        info["ok"] = True  # server is up but didn't return JSON; reachable is enough
+    except Exception as e:
+        info["error"] = str(e)
+    return info
+
+
+def transcribe(audio_path: str) -> str:
+    url = f"{config.STT_BASE_URL}/audio/transcriptions"
+    headers = _auth_headers()
+
+    with open(audio_path, "rb") as f:
+        files = {"file": (os.path.basename(audio_path), f, "audio/mpeg")}
+        data = {"model": config.effective_stt_model(), "response_format": "text"}
+        resp = requests.post(url, headers=headers, files=files, data=data,
+                             timeout=3600)
+    resp.raise_for_status()
+
+    # response_format=text returns plain text; some servers still answer JSON.
+    body = resp.text.strip()
+    ctype = resp.headers.get("content-type", "")
+    if "application/json" in ctype or body.startswith("{"):
+        try:
+            return resp.json().get("text", "").strip()
+        except ValueError:
+            pass
+    return body
