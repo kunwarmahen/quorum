@@ -36,7 +36,7 @@ all its files. State is stored in SQLite, so it survives restarts.
 
 | Component       | Where                  | Purpose                                                                    |
 | --------------- | ---------------------- | -------------------------------------------------------------------------- |
-| **app**         | container (port 8080)  | Web dashboard + REST API + pipeline orchestration                          |
+| **app**         | container (host :7080 → :8080) | Web dashboard + REST API + pipeline orchestration                  |
 | **Ollama**      | your host (port 11434) | Local LLM that writes the minutes (reached via `host.containers.internal`) |
 | **Whisper STT** | external server        | OpenAI-compatible transcription API (set via `STT_BASE_URL`)               |
 | **OBS Studio**  | your host              | Captures screen + audio; controlled by the app over OBS WebSocket          |
@@ -101,11 +101,11 @@ Set the LLM in `.env`:
 This checks that your host Ollama is up (and has the configured model), then
 builds and starts the app container.
 
-Open the dashboard at **http://localhost:8080**.
+Open the dashboard at **http://localhost:7080**.
 
 > If the browser jumps to `https://localhost/` and shows `ERR_CONNECTION_REFUSED`,
 > that's Chrome/Brave auto-upgrading HTTP to HTTPS. Either open
-> **http://127.0.0.1:8080** instead, or enable HTTPS (below).
+> **http://127.0.0.1:7080** instead, or enable HTTPS (below).
 
 ### 4. (Optional) Serve over HTTPS
 
@@ -117,7 +117,7 @@ app serves HTTPS on the same port automatically:
 podman compose up -d --build # restart to pick up ./certs
 ```
 
-Then open **https://localhost:8080**. With [mkcert](https://github.com/FiloSottile/mkcert)
+Then open **https://localhost:7080**. With [mkcert](https://github.com/FiloSottile/mkcert)
 the cert is locally trusted (no warning) — run `sudo mkcert -install` once if the
 CA install was skipped. Without a cert in `./certs`, the app stays on plain HTTP.
 
@@ -214,10 +214,10 @@ ollama list                      # see installed LLMs (on your host)
   Output → Recording), or the app will set it automatically on the next
   _Start_.
 - **Transcription fails / can't connect** — check `STT_BASE_URL` is reachable
-  from the container (`podman exec mm_app curl -s $STT_BASE_URL/models`). If the
+  from the container (`podman exec quorum curl -s $STT_BASE_URL/models`). If the
   hostname won't resolve, add it to `extra_hosts` or use the IP. Use a smaller
   `STT_MODEL` (`...tiny`/`...base`) for faster results.
 - **Minutes step errors / can't reach Ollama** — confirm Ollama is running on
   the host and listening on all interfaces (`OLLAMA_HOST=0.0.0.0 ollama serve`),
   the model in `OLLAMA_MODEL` is present (`ollama list`), and the container can
-  reach it (`podman exec mm_app curl -s http://host.containers.internal:11434/api/tags`).
+  reach it (`podman exec quorum curl -s http://host.containers.internal:11434/api/tags`).

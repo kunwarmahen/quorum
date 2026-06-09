@@ -1,4 +1,4 @@
-# Meeting Minutes stack — run with: podman compose up -d --build
+# Quorum stack — run with: podman compose up -d --build
 #
 # Only the web app runs here. It talks to services that already run on/near
 # your host:
@@ -12,10 +12,10 @@
 services:
   app:
     build: ./app
-    container_name: mm_app
+    container_name: quorum
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "7080:8080"
     environment:
       OBS_HOST: "${OBS_HOST:-host.containers.internal}"
       OBS_PORT: "${OBS_PORT:-4455}"
@@ -24,7 +24,7 @@ services:
       STT_MODEL: "${STT_MODEL:-whisper-1}"
       STT_API_KEY: "${STT_API_KEY:-}"
       OLLAMA_URL: "${OLLAMA_URL:-http://host.containers.internal:11434}"
-      OLLAMA_MODEL: "${OLLAMA_MODEL:-llama3.2}"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-gemma4:12b}"
       DATA_DIR: "/data"
       # Host path of the /data mount, so the app can translate the file
       # paths OBS reports (which are host paths) into container paths.

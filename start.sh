@@ -36,12 +36,12 @@ podman compose up -d --build
 
 # HTTPS is on whenever a cert exists in ./certs (see ./gen-cert.sh).
 if [[ -f certs/cert.pem && -f certs/key.pem ]]; then
-  URL="https://localhost:8080"
+  URL="https://localhost:7080"
 else
-  URL="http://localhost:8080"
+  URL="http://localhost:7080"
   echo
   echo "    Tip: browsers may auto-upgrade http://localhost to https and fail."
-  echo "    Run ./gen-cert.sh to serve trusted HTTPS, or use http://127.0.0.1:8080"
+  echo "    Run ./gen-cert.sh to serve trusted HTTPS, or use http://127.0.0.1:7080"
 fi
 
 echo
