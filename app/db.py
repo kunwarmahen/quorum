@@ -96,6 +96,12 @@ def set_setting(key: str, value: str) -> None:
         conn.commit()
 
 
+def del_setting(key: str) -> None:
+    with _LOCK, _connect() as conn:
+        conn.execute("DELETE FROM settings WHERE key=?", (key,))
+        conn.commit()
+
+
 def reset_running() -> None:
     with _LOCK, _connect() as conn:
         for col in ("audio_status", "transcript_status", "minutes_status"):

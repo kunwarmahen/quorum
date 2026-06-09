@@ -18,8 +18,11 @@ all its files. State is stored in SQLite, so it survives restarts.
 - **One-click pipeline** — record with OBS (or drop in a file) and go from video
   to polished minutes; run the whole chain or any single stage.
 - **Choose your detail level** — Brief / Standard / Detailed minutes.
-- **Runtime model picker** — switch the Whisper and Ollama models from the
-  **⚙ Config** panel; the choice is saved and survives restarts.
+- **Runtime settings** — the **⚙ Settings** modal exposes every connection
+  detail (OBS host/port/password, Whisper base URL + API key, Ollama URL) and
+  the Whisper/Ollama models. Fields start from your `.env` defaults but are
+  overridable live; overrides are saved, survive restarts, and a one-click
+  **Reset to .env** drops them again.
 - **Live health** — top-bar pills show OBS, Whisper, and Ollama status at a glance.
 - **Per-meeting folders** — source + mp3 + transcript + minutes grouped together.
 - **File details at a glance** — each row shows the recording's duration, file
@@ -74,7 +77,7 @@ Set the transcription server in `.env`:
 - `STT_MODEL` — a model id from the server's `/v1/models`
   (e.g. `Systran/faster-whisper-base`, or `Systran/faster-whisper-large-v3`
   for best accuracy). This is the _initial default_ — once running you can
-  switch models from the dashboard's **⚙ Config** panel without editing `.env`.
+  switch models from the dashboard's **⚙ Settings** modal without editing `.env`.
 - `STT_API_KEY` — only if the server requires auth.
 
 > If the STT server is addressed by a hostname that only resolves on your host
@@ -85,7 +88,7 @@ Set the transcription server in `.env`:
 Set the LLM in `.env`:
 
 - `OLLAMA_MODEL` — must exist in your host's `ollama list` (e.g. `gemma4:12b`).
-  Like `STT_MODEL`, this is the initial default; the **⚙ Config** panel in the
+  Like `STT_MODEL`, this is the initial default; the **⚙ Settings** modal in the
   dashboard lets you change it at runtime (the choice is saved and survives
   restarts).
 - `OLLAMA_URL` — defaults to `http://host.containers.internal:11434`; change
@@ -156,10 +159,14 @@ Use the **Sort** dropdown above the table to order by _Newest first_,
 _Oldest first_ (by the file's own date), or _Name (A–Z / Z–A)_. The choice
 sticks across auto-refresh.
 
-**Choose models**
-Click the **⚙** (top-right) to open **Config — models** and pick the Whisper STT
-model and the Ollama model used for minutes. The lists are pulled live from each
-server; your selection is saved and applied to every subsequent run.
+**Settings**
+Click the **⚙** (top-right) to open **Settings**. It's grouped into **OBS**,
+**Whisper STT**, and **Ollama** sections covering every connection detail plus
+the models. Each field is pre-filled from your `.env` default; edit any of them
+and hit **Save** to override it (a field marked _overridden_ differs from
+`.env`). Model fields are dropdowns pulled live from each server. Changes apply
+immediately — after saving, a status line re-probes each service so you can see
+the connections light up. **Reset to .env** discards all overrides.
 
 **Delete a meeting**
 Click the **🗑** on a row. A dialog previews exactly what will be removed — the

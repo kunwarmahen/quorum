@@ -166,7 +166,7 @@ def _obs_health() -> dict:
     st = obs_controller.status()
     h = {
         "name": "OBS",
-        "url": f"{config.OBS_HOST}:{config.OBS_PORT}",
+        "url": f"{config.effective_obs_host()}:{config.effective_obs_port()}",
         "ok": bool(st.get("connected")),
         "recording": bool(st.get("recording")),
     }
@@ -211,22 +211,56 @@ def api_models():
     }
 
 
+def _config_payload() -> dict:
+    """Current state of every configurable setting, for the Config modal.
+
+    Each field carries its UI metadata plus the effective value, the .env
+    default, and whether a runtime override is in effect. Secret values are
+    returned as-is: this is a single-user, self-hosted admin UI and the value
+    came from the operator's own .env.
+    """
+    fields = []
+    for f in config.CONFIG_FIELDS:
+        fields.append({
+            **f,
+            "value": config.effective(f["key"]),
+            "default": config.env_default(f["key"]),
+            "secret": f["key"] in config.SECRET_KEYS,
+            "overridden": config.is_overridden(f["key"]),
+        })
+    return {"fields": fields}
+
+
+@app.get("/api/config")
+def api_get_config():
+    return _config_payload()
+
+
 class ConfigBody(BaseModel):
-    ollama_model: str | None = None
-    stt_model: str | None = None
+    # Map of setting key -> new value. Unknown keys are ignored.
+    values: dict[str, str] = {}
 
 
 @app.post("/api/config")
 def api_set_config(body: ConfigBody):
-    if body.ollama_model:
-        db.set_setting("ollama_model", body.ollama_model.strip())
-    if body.stt_model:
-        db.set_setting("stt_model", body.stt_model.strip())
-    return {
-        "ok": True,
-        "ollama_model": config.effective_ollama_model(),
-        "stt_model": config.effective_stt_model(),
-    }
+    for key, value in body.values.items():
+        if key not in config.CONFIG_KEYS:
+            continue
+        v = (value or "").strip()
+        # Don't let a cleared required field override the default with "".
+        if v == "" and key not in config.SECRET_KEYS:
+            db.del_setting(key)
+        else:
+            db.set_setting(key, v)
+    return _config_payload()
+
+
+@app.delete("/api/config")
+def api_reset_config():
+    """Drop all runtime overrides; settings fall back to the .env defaults."""
+    for key in config.CONFIG_KEYS:
+        db.del_setting(key)
+    return _config_payload()
 
 
 # --------------------------------------------------------------------------

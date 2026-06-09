@@ -36,30 +36,6 @@
   </header>
 
   <main>
-    <section class="panel config-panel" id="configPanel" hidden>
-      <div class="panel-head">
-        <h2>Config — models</h2>
-        <button class="x" id="configClose" title="Close">✕</button>
-      </div>
-      <p class="muted">
-        Pick the models used for transcription and minutes. Choices are saved
-        and used for every run. The lists come live from each server; if a
-        server is unreachable the current value is still shown.
-      </p>
-      <div class="config-grid">
-        <label class="lvl">
-          Whisper STT model
-          <select id="sttModelSelect"><option>loading…</option></select>
-          <span class="cfg-note" id="sttNote"></span>
-        </label>
-        <label class="lvl">
-          Ollama model (minutes)
-          <select id="ollamaModelSelect"><option>loading…</option></select>
-          <span class="cfg-note" id="ollamaNote"></span>
-        </label>
-      </div>
-    </section>
-
     <section class="panel record-panel">
       <div class="record-left">
         <h2>Record a meeting</h2>
@@ -134,6 +110,30 @@
       <div class="tab-pane" id="pane-transcript"></div>
     </div>
   </aside>
+
+  <!-- Settings -->
+  <div class="modal-backdrop" id="configBackdrop"></div>
+  <div class="modal modal-lg" id="configModal" role="dialog" aria-modal="true" aria-labelledby="configTitle">
+    <div class="modal-head">
+      <h3 id="configTitle">Settings</h3>
+      <button class="x" id="configClose" title="Close">✕</button>
+    </div>
+    <p class="muted">
+      These start from your <code>.env</code> defaults and can be overridden
+      here. Changes save to the database and take effect immediately — no
+      restart needed.
+    </p>
+    <form id="configForm" class="config-form">
+      <p class="muted">Loading…</p>
+    </form>
+    <div class="cfg-health" id="cfgHealth" hidden></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-danger-ghost" id="configReset" title="Discard overrides and use the .env values">↺ Reset to .env</button>
+      <span class="modal-spacer"></span>
+      <button type="button" class="btn" id="configCancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="configSave">Save</button>
+    </div>
+  </div>
 
   <!-- Delete confirmation -->
   <div class="modal-backdrop" id="confirmBackdrop"></div>

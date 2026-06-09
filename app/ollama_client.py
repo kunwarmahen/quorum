@@ -6,7 +6,7 @@ import config
 
 def list_models() -> list:
     """Return the names of all models installed in Ollama (may raise)."""
-    resp = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=5)
+    resp = requests.get(f"{config.effective_ollama_url()}/api/tags", timeout=5)
     resp.raise_for_status()
     names = [m.get("name", "") for m in resp.json().get("models", [])]
     return sorted(n for n in names if n)
@@ -16,7 +16,7 @@ def health() -> dict:
     """Liveness check for the Ollama server, plus whether the configured model
     is available. Never raises; used by the dashboard health panel."""
     model = config.effective_ollama_model()
-    info = {"name": "Ollama", "url": config.OLLAMA_URL, "ok": False,
+    info = {"name": "Ollama", "url": config.effective_ollama_url(), "ok": False,
             "model": model}
     try:
         names = list_models()
@@ -31,7 +31,7 @@ def health() -> dict:
 
 def _model_present(model: str) -> bool:
     try:
-        resp = requests.get(f"{config.OLLAMA_URL}/api/tags", timeout=10)
+        resp = requests.get(f"{config.effective_ollama_url()}/api/tags", timeout=10)
         resp.raise_for_status()
         names = {m.get("name", "") for m in resp.json().get("models", [])}
         # tags come back as "llama3.2:latest"; match with or without the tag.
@@ -46,7 +46,7 @@ def ensure_model(model: str = None) -> None:
     if _model_present(model):
         return
     resp = requests.post(
-        f"{config.OLLAMA_URL}/api/pull",
+        f"{config.effective_ollama_url()}/api/pull",
         json={"name": model, "stream": False},
         timeout=3600,
     )
@@ -58,7 +58,7 @@ def generate(prompt: str, model: str = None) -> str:
     model = model or config.effective_ollama_model()
     ensure_model(model)
     resp = requests.post(
-        f"{config.OLLAMA_URL}/api/generate",
+        f"{config.effective_ollama_url()}/api/generate",
         json={"model": model, "prompt": prompt, "stream": False},
         timeout=3600,
     )

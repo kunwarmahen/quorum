@@ -14,16 +14,17 @@ def _client():
         import obsws_python as obs
     except ImportError as e:  # pragma: no cover
         raise OBSError("obsws-python not installed") from e
+    host, port = config.effective_obs_host(), config.effective_obs_port()
     try:
         return obs.ReqClient(
-            host=config.OBS_HOST,
-            port=config.OBS_PORT,
-            password=config.OBS_PASSWORD or "",
+            host=host,
+            port=port,
+            password=config.effective_obs_password() or "",
             timeout=5,
         )
     except Exception as e:
         raise OBSError(
-            f"Cannot reach OBS at {config.OBS_HOST}:{config.OBS_PORT}. "
+            f"Cannot reach OBS at {host}:{port}. "
             f"Is OBS running with the WebSocket server enabled? ({e})"
         ) from e
 

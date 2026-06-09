@@ -159,57 +159,147 @@ async function refreshHealth() {
   }
 }
 
-// --- config panel (model selection) ----------------------------------------
-function fillModelSelect(sel, noteEl, info) {
-  const models = info.models || [];
-  const current = info.current || "";
-  const opts = models.slice();
-  // Always keep the current selection visible, even if the server is down or
-  // the model isn't in the returned list.
-  if (current && !opts.includes(current)) opts.unshift(current);
-  sel.innerHTML = opts
-    .map((m) => `<option value="${esc(m)}" ${m === current ? "selected" : ""}>${esc(m)}</option>`)
-    .join("") || `<option value="">(no models)</option>`;
-  if (info.ok === false) {
-    noteEl.textContent = "server unreachable — showing saved value";
-    noteEl.className = "cfg-note bad";
-  } else {
-    noteEl.textContent = `${models.length} available`;
-    noteEl.className = "cfg-note";
+// --- settings modal ---------------------------------------------------------
+// Live model lists per server, keyed as in /api/models ("stt" | "ollama").
+let modelLists = {};
+
+function fieldControl(f) {
+  // A <select> for model fields (options come from the live server list), a
+  // plain input otherwise. data-key ties each control back to its setting.
+  if (f.type === "model") {
+    const info = modelLists[f.models] || {};
+    const models = info.models || [];
+    const opts = models.slice();
+    if (f.value && !opts.includes(f.value)) opts.unshift(f.value); // keep current visible
+    const options = opts
+      .map((m) => `<option value="${esc(m)}" ${m === f.value ? "selected" : ""}>${esc(m)}</option>`)
+      .join("") || `<option value="${esc(f.value)}">${esc(f.value || "(no models)")}</option>`;
+    let note = "";
+    if (info.ok === false) note = `<span class="cfg-note bad">server unreachable — showing saved value</span>`;
+    else if (info.models) note = `<span class="cfg-note">${models.length} available</span>`;
+    return `<select data-key="${f.key}">${options}</select>${note}`;
   }
+  const type = f.type === "password" ? "password" : f.type === "number" ? "number" : "text";
+  const ph = f.default ? ` placeholder="${esc(f.default)}"` : "";
+  const val = f.secret ? esc(f.value) : esc(f.value);
+  return `<input type="${type}" data-key="${f.key}" value="${val}"${ph} autocomplete="off" spellcheck="false" />`;
 }
 
-async function loadModels() {
-  let data;
+function renderConfigForm(fields) {
+  // Group fields by their `group` (OBS / Whisper STT / Ollama), preserving order.
+  const groups = [];
+  const byName = {};
+  for (const f of fields) {
+    if (!byName[f.group]) { byName[f.group] = []; groups.push(f.group); }
+    byName[f.group].push(f);
+  }
+  const html = groups.map((g) => {
+    const rows = byName[g].map((f) => {
+      const overridden = f.overridden ? `<span class="cfg-tag" title="Overriding the .env default">overridden</span>` : "";
+      const hint = f.hint ? `<span class="cfg-hint">${esc(f.hint)}</span>` : "";
+      return `<label class="cfg-row">
+        <span class="cfg-label">${esc(f.label)}${overridden}</span>
+        ${fieldControl(f)}
+        ${hint}
+      </label>`;
+    }).join("");
+    return `<fieldset class="cfg-group"><legend>${esc(g)}</legend>${rows}</fieldset>`;
+  }).join("");
+  $("#configForm").innerHTML = html;
+}
+
+async function openConfig() {
+  $("#configModal").classList.add("open");
+  $("#configBackdrop").classList.add("open");
+  $("#cfgHealth").hidden = true;
+  $("#configForm").innerHTML = `<p class="muted">Loading…</p>`;
+  // Field values are instant; live model lists may lag/​fail — fetch both,
+  // render once values arrive, then re-render when model lists land.
+  let cfg;
   try {
-    data = await api("/api/models");
+    cfg = await api("/api/config");
   } catch (e) {
+    $("#configForm").innerHTML = `<p class="cfg-note bad">Could not load settings.</p>`;
     return;
   }
-  fillModelSelect($("#sttModelSelect"), $("#sttNote"), data.stt || {});
-  fillModelSelect($("#ollamaModelSelect"), $("#ollamaNote"), data.ollama || {});
+  renderConfigForm(cfg.fields);
+  try {
+    modelLists = await api("/api/models");
+    renderConfigForm(cfg.fields); // now with populated model dropdowns
+  } catch (e) {
+    /* model dropdowns just keep the saved value */
+  }
 }
 
-async function saveConfig() {
-  await api("/api/config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      stt_model: $("#sttModelSelect").value,
-      ollama_model: $("#ollamaModelSelect").value,
-    }),
+function closeConfig() {
+  $("#configModal").classList.remove("open");
+  $("#configBackdrop").classList.remove("open");
+}
+
+function collectConfigValues() {
+  const values = {};
+  document.querySelectorAll("#configForm [data-key]").forEach((el) => {
+    values[el.dataset.key] = el.value;
   });
-  refreshHealth(); // reflect the new model's readiness in the health pills
+  return values;
 }
 
-$("#btnConfig").addEventListener("click", () => {
-  const p = $("#configPanel");
-  p.hidden = !p.hidden;
-  if (!p.hidden) loadModels();
-});
-$("#configClose").addEventListener("click", () => ($("#configPanel").hidden = true));
-$("#sttModelSelect").addEventListener("change", saveConfig);
-$("#ollamaModelSelect").addEventListener("change", saveConfig);
+async function saveConfigModal() {
+  const btn = $("#configSave");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  try {
+    const cfg = await api("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ values: collectConfigValues() }),
+    });
+    renderConfigForm(cfg.fields); // reflect new "overridden" tags
+    await showConfigHealth(); // re-probe so the user sees connections light up
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save";
+  }
+}
+
+async function resetConfig() {
+  if (!confirm("Discard all overrides and use the .env defaults?")) return;
+  const cfg = await api("/api/config", { method: "DELETE" });
+  modelLists = await api("/api/models").catch(() => modelLists);
+  renderConfigForm(cfg.fields);
+  await showConfigHealth();
+}
+
+// Show a one-line liveness summary inside the modal after a save/reset, and
+// refresh the top-bar pills.
+async function showConfigHealth() {
+  const el = $("#cfgHealth");
+  el.hidden = false;
+  el.className = "cfg-health";
+  el.textContent = "Checking connections…";
+  let health;
+  try {
+    health = await api("/api/health");
+  } catch (e) {
+    el.className = "cfg-health bad";
+    el.textContent = "Could not reach the server.";
+    return;
+  }
+  renderHealth(health);
+  refresh(); // OBS pill is driven by the recordings poll
+  const parts = (health.services || []).map(
+    (s) => `${s.name}: ${s.ok ? "ok" : "down"}`
+  );
+  el.className = "cfg-health" + (health.ok ? "" : " bad");
+  el.textContent = parts.join("  ·  ");
+}
+
+$("#btnConfig").addEventListener("click", openConfig);
+$("#configClose").addEventListener("click", closeConfig);
+$("#configCancel").addEventListener("click", closeConfig);
+$("#configBackdrop").addEventListener("click", closeConfig);
+$("#configSave").addEventListener("click", saveConfigModal);
+$("#configReset").addEventListener("click", resetConfig);
 
 function setRecording(on) {
   recordingActive = on;
@@ -388,7 +478,7 @@ $("#confirmDelete").addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeConfirm();
+  if (e.key === "Escape") { closeConfirm(); closeConfig(); }
 });
 
 // --- drawer ----------------------------------------------------------------

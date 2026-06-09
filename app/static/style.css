@@ -54,12 +54,6 @@ body {
 }
 .topbar-right { display: flex; align-items: center; gap: 12px; }
 .btn-gear { font-size: 16px; line-height: 1; padding: 6px 10px; }
-.config-panel .panel-head { display: flex; align-items: center; justify-content: space-between; }
-.config-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px; margin-top: 12px;
-}
-.config-grid select { width: 100%; }
 .cfg-note { font-size: 11px; color: var(--muted); }
 .cfg-note.bad { color: var(--amber); }
 .health { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -223,3 +217,44 @@ tr:last-child td { border-bottom: none; }
 }
 .del-confirm input:focus { outline: none; border-color: var(--red); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.modal-spacer { flex: 1; }
+
+/* --- Settings modal -------------------------------------------------------- */
+.modal-lg { width: min(620px, 94vw); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; }
+.modal-head h3 { margin: 0; }
+
+.config-form { margin-top: 6px; max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+.cfg-group {
+  border: 1px solid var(--line); border-radius: 11px; padding: 6px 16px 16px;
+  margin: 14px 0 0;
+}
+.cfg-group legend {
+  padding: 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .4px;
+  text-transform: uppercase; color: var(--accent);
+}
+.cfg-row { display: block; margin-top: 14px; }
+.cfg-row:first-of-type { margin-top: 4px; }
+.cfg-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted); margin-bottom: 6px;
+}
+.cfg-row input, .cfg-row select {
+  display: block; width: 100%; padding: 9px 11px;
+  background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px; font-size: 14px;
+}
+.cfg-row input:focus, .cfg-row select:focus { outline: none; border-color: var(--accent); }
+.cfg-row .cfg-note { display: inline-block; margin-top: 5px; }
+.cfg-hint { display: block; margin-top: 5px; font-size: 11px; color: var(--muted); }
+.cfg-tag {
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px;
+  color: var(--amber); border: 1px solid var(--amber); border-radius: 999px;
+  padding: 1px 7px; line-height: 1.4;
+}
+.cfg-health {
+  margin-top: 14px; padding: 9px 12px; border-radius: 9px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  font-size: 12px; color: var(--green); word-break: break-word;
+}
+.cfg-health.bad { color: var(--amber); }

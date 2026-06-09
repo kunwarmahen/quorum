@@ -11,14 +11,15 @@ import config
 
 
 def _auth_headers() -> dict:
-    if config.STT_API_KEY:
-        return {"Authorization": f"Bearer {config.STT_API_KEY}"}
+    key = config.effective_stt_api_key()
+    if key:
+        return {"Authorization": f"Bearer {key}"}
     return {}
 
 
 def list_models() -> list:
     """Return the model ids the STT server reports via /v1/models (may raise)."""
-    resp = requests.get(f"{config.STT_BASE_URL}/models",
+    resp = requests.get(f"{config.effective_stt_base_url()}/models",
                         headers=_auth_headers(), timeout=5)
     resp.raise_for_status()
     ids = [m.get("id", "") for m in resp.json().get("data", [])]
@@ -29,7 +30,7 @@ def health() -> dict:
     """Liveness check for the STT server, plus whether the configured model is
     listed by /v1/models. Never raises; used by the dashboard health panel."""
     model = config.effective_stt_model()
-    info = {"name": "Whisper STT", "url": config.STT_BASE_URL, "ok": False,
+    info = {"name": "Whisper STT", "url": config.effective_stt_base_url(), "ok": False,
             "model": model}
     try:
         ids = list_models()
@@ -44,7 +45,7 @@ def health() -> dict:
 
 
 def transcribe(audio_path: str) -> str:
-    url = f"{config.STT_BASE_URL}/audio/transcriptions"
+    url = f"{config.effective_stt_base_url()}/audio/transcriptions"
     headers = _auth_headers()
 
     with open(audio_path, "rb") as f:
