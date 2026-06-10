@@ -84,6 +84,8 @@ main { max-width: 1080px; margin: 0 auto; padding: 24px; display: flex; flex-dir
 
 .record-panel { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .record-actions { display: flex; align-items: center; gap: 12px; }
+.auto-run { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+.auto-run input { cursor: pointer; }
 .rec-timer { font-variant-numeric: tabular-nums; color: var(--red); font-weight: 600; min-width: 64px; text-align: right; }
 
 .btn {

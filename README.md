@@ -17,6 +17,8 @@ all its files. State is stored in SQLite, so it survives restarts.
 
 - **One-click pipeline** — record with OBS (or drop in a file) and go from video
   to polished minutes; run the whole chain or any single stage.
+- **Auto-process on stop** — leave the toggle on (it remembers your choice) and
+  the full pipeline kicks off automatically the moment recording stops.
 - **Choose your detail level** — Brief / Standard / Detailed minutes.
 - **Runtime settings** — the **⚙ Settings** modal exposes every connection
   detail (OBS host/port/password, Whisper base URL + API key, Ollama URL) and
@@ -129,9 +131,13 @@ CA install was skipped. Without a cert in `./certs`, the app stays on plain HTTP
 **Record a meeting**
 
 1. Make sure OBS is running (the top-right indicator turns green when connected).
-2. Click **Start recording** → OBS begins recording into `~/MeetingMinutes/recordings`.
-3. Click **Stop & process** → the `.mkv` is registered as a new file in the table.
-4. Pick a **Minutes detail** level (Brief / Standard / Detailed) and click **Run all**.
+2. Pick a **Minutes detail** level (Brief / Standard / Detailed). Leave
+   **Auto-process on stop** checked to run the pipeline automatically, or uncheck
+   it to just capture the file.
+3. Click **Start recording** → OBS begins recording into `~/MeetingMinutes/recordings`.
+4. Click **Stop & process** → the `.mkv` is registered as a new file. With
+   auto-process on, the full pipeline starts immediately; otherwise click
+   **Run all** on the row when you're ready.
 
 **Process an existing file**
 Drop any `.mkv`, `.mp4`, `.mp3`, `.wav`, etc. into `~/MeetingMinutes/recordings`,

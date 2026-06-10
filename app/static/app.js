@@ -19,6 +19,16 @@ function levelFor() {
   return $("#levelSelect").value;
 }
 
+// Persist the "auto-process on stop" toggle across reloads.
+function initAutoRun() {
+  const box = $("#autoRun");
+  const saved = localStorage.getItem("autoRun");
+  if (saved !== null) box.checked = saved === "1";
+  box.addEventListener("change", () =>
+    localStorage.setItem("autoRun", box.checked ? "1" : "0")
+  );
+}
+
 function stageChip(label, status) {
   const cls = ["pending", "running", "done", "error"].includes(status) ? status : "pending";
   return `<span class="stage ${cls}" title="${status}"><span class="s-dot"></span>${label}</span>`;
@@ -301,6 +311,8 @@ $("#configBackdrop").addEventListener("click", closeConfig);
 $("#configSave").addEventListener("click", saveConfigModal);
 $("#configReset").addEventListener("click", resetConfig);
 
+initAutoRun();
+
 function setRecording(on) {
   recordingActive = on;
   $("#btnStart").disabled = on;
@@ -379,6 +391,15 @@ $("#btnStop").addEventListener("click", async () => {
   $("#btnStop").disabled = true;
   const r = await api("/api/obs/stop", { method: "POST" });
   if (r.warning) alert(r.warning);
+  // Auto-run the full pipeline on the freshly registered recording. The stop
+  // response only carries an id on the success path (no id on the warning path).
+  if (r.id && $("#autoRun").checked) {
+    await api("/api/recordings/" + r.id + "/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ level: levelFor() }),
+    });
+  }
   await refresh();
 });
 
