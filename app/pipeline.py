@@ -4,6 +4,7 @@ Each stage updates the DB so the dashboard can show live status, and stages
 are resumable: rerunning a file picks up wherever it left off.
 """
 import os
+import re
 import subprocess
 
 import config
@@ -42,20 +43,101 @@ MINUTES_LEVELS = {
 DEFAULT_LEVEL = "standard"
 
 
-def _minutes_prompt(level: str, transcript: str) -> str:
+# Prompt size limits, in characters (~4 chars per token). The configured
+# Ollama model runs with a 32K-token context that must also fit the
+# instructions and the generated minutes, so transcripts beyond
+# MAX_SINGLE_PROMPT_CHARS are summarized chunk-by-chunk first (map-reduce).
+MAX_SINGLE_PROMPT_CHARS = 48_000
+CHUNK_CHARS = 40_000
+
+
+def _minutes_prompt(level: str, body: str, from_notes: bool = False) -> str:
     spec = MINUTES_LEVELS.get(level, MINUTES_LEVELS[DEFAULT_LEVEL])
+    if from_notes:
+        source_desc = (
+            "the notes below, which were taken from consecutive parts of one "
+            "meeting's transcript"
+        )
+        label = "NOTES"
+    else:
+        source_desc = "the meeting transcript below"
+        label = "TRANSCRIPT"
     return (
-        "You are an expert meeting-minutes assistant. Based ONLY on the meeting "
-        "transcript below, produce clean, professional meeting minutes in "
+        "You are an expert meeting-minutes assistant. Based ONLY on "
+        f"{source_desc}, produce clean, professional meeting minutes in "
         "Markdown.\n\n"
         f"{spec['instructions']}\n\n"
-        "Do not invent information that is not supported by the transcript. If "
+        "Do not invent information that is not supported by the source. If "
         "something (like attendee names or dates) is not stated, omit it rather "
         "than guessing.\n\n"
-        "=== TRANSCRIPT START ===\n"
-        f"{transcript}\n"
-        "=== TRANSCRIPT END ===\n\n"
+        f"=== {label} START ===\n"
+        f"{body}\n"
+        f"=== {label} END ===\n\n"
         "Meeting Minutes:"
+    )
+
+
+def _chunk_notes_prompt(idx: int, total: int, chunk: str) -> str:
+    return (
+        f"The text below is part {idx} of {total} of one meeting's transcript. "
+        "Write detailed notes on this part in Markdown bullets, covering: "
+        "topics discussed, decisions made, action items (with owner and due "
+        "date if mentioned), and open questions. Base the notes ONLY on this "
+        "text; do not invent information.\n\n"
+        "=== TRANSCRIPT PART START ===\n"
+        f"{chunk}\n"
+        "=== TRANSCRIPT PART END ===\n\n"
+        "Notes:"
+    )
+
+
+def _collapse_repetitions(text: str, max_repeats: int = 2) -> str:
+    """Collapse pathological runs of an identical sentence. Whisper can get
+    stuck looping one sentence thousands of times (typically over silence),
+    which bloats the transcript far past any model's context window."""
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    out, prev, count = [], None, 0
+    for s in sentences:
+        key = s.strip().lower()
+        if key and key == prev:
+            count += 1
+            if count > max_repeats:
+                continue
+        else:
+            prev, count = key, 1
+        out.append(s)
+    return " ".join(out)
+
+
+def _split_chunks(text: str, size: int = CHUNK_CHARS) -> list:
+    """Split text into ~size-char chunks, breaking on sentence boundaries."""
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    chunks, cur, cur_len = [], [], 0
+    for s in sentences:
+        if cur and cur_len + len(s) > size:
+            chunks.append(" ".join(cur))
+            cur, cur_len = [], 0
+        cur.append(s)
+        cur_len += len(s) + 1
+    if cur:
+        chunks.append(" ".join(cur))
+    return chunks
+
+
+def _generate_minutes_text(level: str, transcript: str) -> str:
+    """Produce minutes from a transcript of any length. Short transcripts go
+    to the model in one shot; long ones are summarized per-chunk and the
+    chunk notes are then merged into the final minutes."""
+    transcript = _collapse_repetitions(transcript)
+    if len(transcript) <= MAX_SINGLE_PROMPT_CHARS:
+        return ollama_client.generate(_minutes_prompt(level, transcript))
+    chunks = _split_chunks(transcript)
+    notes = [
+        ollama_client.generate(_chunk_notes_prompt(i, len(chunks), chunk))
+        for i, chunk in enumerate(chunks, 1)
+    ]
+    return ollama_client.generate(
+        _minutes_prompt(level, "\n\n".join(notes), from_notes=True)
     )
 
 
@@ -151,7 +233,7 @@ def generate_minutes(rec_id: int, level: str = DEFAULT_LEVEL) -> dict:
     db.update(rec_id, minutes_status="running", minutes_level=level,
               status="processing", error=None)
     try:
-        text = ollama_client.generate(_minutes_prompt(level, transcript))
+        text = _generate_minutes_text(level, transcript)
     except Exception as e:
         db.update(rec_id, minutes_status="error", error=f"Ollama error: {e}")
         raise

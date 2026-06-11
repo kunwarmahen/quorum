@@ -50,7 +50,11 @@ def transcribe(audio_path: str) -> str:
 
     with open(audio_path, "rb") as f:
         files = {"file": (os.path.basename(audio_path), f, "audio/mpeg")}
-        data = {"model": config.effective_stt_model(), "response_format": "text"}
+        # vad_filter skips silent stretches (supported by speaches /
+        # faster-whisper-server). Without it Whisper can hallucinate over
+        # silence and loop one sentence for the rest of the recording.
+        data = {"model": config.effective_stt_model(), "response_format": "text",
+                "vad_filter": "true"}
         resp = requests.post(url, headers=headers, files=files, data=data,
                              timeout=3600)
     resp.raise_for_status()

@@ -63,4 +63,16 @@ def generate(prompt: str, model: str = None) -> str:
         timeout=3600,
     )
     resp.raise_for_status()
-    return resp.json().get("response", "").strip()
+    data = resp.json()
+    text = data.get("response", "").strip()
+    # Ollama reports success (HTTP 200) even when the prompt overflowed the
+    # model's context window: it truncates the prompt to fill the context and
+    # returns an empty response with done_reason "length". Surface that as an
+    # error instead of letting an empty result flow downstream.
+    if not text:
+        reason = data.get("done_reason", "unknown")
+        raise RuntimeError(
+            f"model '{model}' returned an empty response "
+            f"(done_reason={reason}; prompt likely exceeds the context window)"
+        )
+    return text
