@@ -46,6 +46,17 @@ def _classify(path: str):
     return None
 
 
+def _classify_media(path: str) -> str:
+    """Classify a finished recording as 'video' or 'audio'. Trust the extension
+    when we recognize it; otherwise probe the actual streams so an audio-only
+    recording (e.g. OBS set to capture a mic-only track) isn't mislabeled as
+    video and needlessly run through ffmpeg extraction."""
+    kind = _classify(path)
+    if kind:
+        return kind
+    return "video" if pipeline.has_video_stream(path) else "audio"
+
+
 def _organize(path: str) -> str:
     """Move a loose media file in the recordings root into its own folder so
     each meeting keeps its source + generated files together. Idempotent: a
@@ -372,7 +383,7 @@ def api_obs_stop():
             },
         )
 
-    kind = _classify(container_path) or "video"
+    kind = _classify_media(container_path)
     rec_id = register_media(container_path, kind)
     db.update(rec_id, status="new", is_recording=0)
     return {"ok": True, "id": rec_id, "path": db.get(rec_id)["source_path"]}

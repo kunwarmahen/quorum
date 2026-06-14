@@ -157,6 +157,30 @@ def probe_duration(path: str):
         return None
 
 
+def has_video_stream(path: str) -> bool:
+    """True if the file has a real video stream, ignoring embedded cover art
+    (which audio files sometimes carry as an 'attached_pic' video stream).
+
+    Used to tell an audio-only recording from a video one when the file's
+    extension isn't one we recognize -- e.g. OBS configured to capture a
+    mic-only track into a container we don't list in AUDIO_EXTS. Returns False
+    (i.e. treat as audio) when ffprobe is unavailable or can't read the file."""
+    if not path or not os.path.exists(path):
+        return False
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v",
+             "-show_entries", "stream_disposition=attached_pic",
+             "-of", "default=noprint_wrappers=1:nokey=1", path],
+            check=True, capture_output=True, text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    # One line ("0" or "1") per video stream; a "0" is a genuine video stream
+    # rather than attached cover art.
+    return any(line.strip() == "0" for line in out.stdout.splitlines())
+
+
 def _sidecar(source_path: str, suffix: str) -> str:
     # Artifacts live next to the source, i.e. inside the meeting's own folder.
     base = os.path.splitext(os.path.basename(source_path))[0]

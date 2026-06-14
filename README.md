@@ -7,6 +7,9 @@ through a fully local pipeline:
 OBS recording (.mkv)  →  mp3  →  transcript (Whisper)  →  meeting minutes (LLM)
 ```
 
+If OBS is set to capture audio only (e.g. a mic-only `.mp3`), the extraction
+step is skipped automatically and it goes straight to transcription.
+
 Everything runs locally with **Podman**. The web dashboard lists every media
 file, shows where each one is in the pipeline, lets you run any stage (or the
 whole thing), pick how detailed the minutes should be, sort the list, copy the
@@ -135,9 +138,12 @@ CA install was skipped. Without a cert in `./certs`, the app stays on plain HTTP
    **Auto-process on stop** checked to run the pipeline automatically, or uncheck
    it to just capture the file.
 3. Click **Start recording** → OBS begins recording into `~/MeetingMinutes/recordings`.
-4. Click **Stop & process** → the `.mkv` is registered as a new file. With
+4. Click **Stop & process** → the recording is registered as a new file. With
    auto-process on, the full pipeline starts immediately; otherwise click
-   **Run all** on the row when you're ready.
+   **Run all** on the row when you're ready. Audio-only recordings (a mic-only
+   `.mp3` etc.) are detected from the file's streams, so they're handled
+   correctly even if the container extension is one Quorum doesn't recognize,
+   and they skip the mp3-extraction stage.
 
 **Process an existing file**
 Drop any `.mkv`, `.mp4`, `.mp3`, `.wav`, etc. into `~/MeetingMinutes/recordings`,
