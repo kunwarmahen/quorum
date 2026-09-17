@@ -1,4 +1,13 @@
-# Quorum stack — run with: podman compose up -d --build
+# Quorum stack.
+#
+# NOTE: normal startup is ./start.sh, which builds the image and restarts the
+# systemd quadlet at ~/.config/containers/systemd/quorum.container (that unit
+# is what survives a reboot).
+#
+# This file is for one-off local runs only. It claims the same container name
+# ("quorum") and the same host port 7080 as the unit, so stop the unit first:
+#     systemctl --user stop quorum.service
+#     podman compose up -d --build
 #
 # Only the web app runs here. It talks to services that already run on/near
 # your host:

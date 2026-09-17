@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
-# Bring up the Meeting Minutes stack with Podman and make sure the Ollama
-# model is available.
+# Bring up the Quorum stack and make sure the Ollama model is available.
+#
+# The container is managed by systemd via the quadlet at
+#   ~/.config/containers/systemd/quorum.container
+# so it also comes back automatically after a reboot. This script builds the
+# image and hands over to systemd; it deliberately does NOT run
+# "podman compose up", which would fight the unit for the name "quorum" and
+# port 7080.
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
+IMAGE="localhost/quorum-app:latest"
+UNIT="quorum.service"
 DATA_DIR="${HOME}/MeetingMinutes"
+
 mkdir -p "${DATA_DIR}/recordings"
 
 if [[ ! -f .env ]]; then
@@ -31,8 +40,23 @@ else
   echo "    Start it ('ollama serve') before generating minutes."
 fi
 
-echo "==> Building and starting the app container"
-podman compose up -d --build
+echo "==> Building ${IMAGE}"
+podman build -t "${IMAGE}" ./app
+
+echo "==> Restarting ${UNIT}"
+# Picks up edits to the quadlet, and clears the failed state from any earlier
+# crash so a restart isn't refused.
+systemctl --user daemon-reload
+systemctl --user reset-failed "${UNIT}" 2>/dev/null || true
+systemctl --user restart "${UNIT}"
+
+# The unit is Type=notify; if it went active the container is up.
+if ! systemctl --user is-active --quiet "${UNIT}"; then
+  echo
+  echo "ERROR: ${UNIT} did not start. Recent logs:"
+  journalctl --user -u "${UNIT}" -n 30 --no-pager
+  exit 1
+fi
 
 # HTTPS is on whenever a cert exists in ./certs (see ./gen-cert.sh).
 if [[ -f certs/cert.pem && -f certs/key.pem ]]; then
@@ -47,3 +71,7 @@ fi
 echo
 echo "All set. Open the dashboard:  ${URL}"
 echo "Make sure OBS is running on the host with the WebSocket server enabled."
+echo
+echo "  logs:    journalctl --user -u ${UNIT} -f"
+echo "  stop:    systemctl --user stop ${UNIT}"
+echo "  status:  systemctl --user status ${UNIT}"
