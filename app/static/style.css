@@ -186,6 +186,9 @@ tr:last-child td { border-bottom: none; }
 .tab-pane { line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
 .tab-pane h1, .tab-pane h2, .tab-pane h3 { color: var(--text); }
 .tab-pane code { background: var(--panel-2); padding: 2px 5px; border-radius: 4px; }
+.tab-pane table { border-collapse: collapse; width: 100%; white-space: normal; margin: 8px 0; }
+.tab-pane th, .tab-pane td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+.tab-pane th { background: var(--panel-2); color: var(--text); }
 .placeholder { color: var(--muted); font-style: italic; }
 
 /* Delete confirmation modal */

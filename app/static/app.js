@@ -520,10 +520,42 @@ function mdToHtml(md) {
 
   const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
 
-  for (const raw of lines) {
-    const line = raw.replace(/\s+$/, "");
+  const isRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+  const isSep = (l) => /^\s*\|(\s*:?-+:?\s*\|)+\s*$/.test(l);
+  const cells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => inline(c.trim()));
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].replace(/\s+$/, "");
     let m;
-    if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
+    if (isRow(line)) {
+      // Gather the table's rows. Models often emit blank lines between rows,
+      // so a blank line only ends the table if no row follows it.
+      const rows = [line];
+      let j = i + 1;
+      while (j < lines.length) {
+        if (isRow(lines[j])) { rows.push(lines[j]); j++; continue; }
+        let k = j;
+        while (k < lines.length && lines[k].trim() === "") k++;
+        if (k > j && k < lines.length && isRow(lines[k])) { j = k; continue; }
+        break;
+      }
+      i = j - 1;
+      closeList();
+      const body = rows.filter((r) => !isSep(r));
+      const head = isSep(rows[1] || "") ? body.shift() : null;
+      // Built as one string: the pane uses pre-wrap, so newlines between
+      // table tags would render as stray gaps.
+      let html = "<table>";
+      if (head) html += "<thead><tr>" + cells(head).map((c) => `<th>${c}</th>`).join("") + "</tr></thead>";
+      html += "<tbody>";
+      if (body.length) {
+        html += body.map((r) => "<tr>" + cells(r).map((c) => `<td>${c}</td>`).join("") + "</tr>").join("");
+      } else {
+        const span = head ? cells(head).length : 1;
+        html += `<tr><td colspan="${span}" class="placeholder">None recorded.</td></tr>`;
+      }
+      out.push(html + "</tbody></table>");
+    } else if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
       closeList();
       const lvl = Math.min(m[1].length, 6);
       out.push(`<h${lvl}>${inline(m[2])}</h${lvl}>`);
